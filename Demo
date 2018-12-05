@@ -1,0 +1,610 @@
+using MySql.Data.MySqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Web;
+using System.Web.Http;
+using WebAPI.Common;
+using WebApiTest1.Common_code;
+using WebApiTest1.Models;
+
+namespace WebApiTest1.Controllers
+{
+    [RoutePrefix("api/gaizao_dimian")]
+    public class gaizao_dimianController : ApiController
+    {
+        // GET: gaizao_dimian
+        /// <summary>
+        /// 查询全部数据
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("AllSelect")]
+        public Dictionary<string, object> AllSelect([FromBody] GaiZao_DiMianModels s)
+        {
+            string where = "";
+            if (s.LuJu != null && s.LuJu != "" && s.LuJu != "请选择")  
+            {
+                where += " and str_com_name = '" + s.LuJu + "'";
+            }
+            if (s.ZhiXingRen_ID != null && s.ZhiXingRen_ID != "")
+            {
+                string[] arr = s.ZhiXingRen_ID.Split(',');
+                string arrWhere = "";
+                for (int i = 0; i < arr.Length; i++)
+                {
+                    arrWhere += "'" + arr[i] + "',";
+                }
+                arrWhere = arrWhere.TrimEnd(',');
+                where += " and gz.ZhiXingRen_id in(" + arrWhere + ")";
+            }
+            if (s.id != null)
+            {
+                where += " and gz.id = '" + s.id + "'";
+            }
+            if (s.ZhuangTai != null && s.ZhuangTai != "")
+            {
+                where += " and gz.ZhuangTai = '" + s.ZhuangTai + "'";
+            }
+            if (s.FenGongSi != null && s.FenGongSi != "")
+            {
+                where += " and gz.FenGongSi like '%" + s.FenGongSi + "%'";
+            }
+            if (s.XiangMuMingCheng != null && s.XiangMuMingCheng != "")
+            {
+                where += " and gz.XiangMuMingCheng like '%" + s.XiangMuMingCheng + "%'";
+            }
+            if (s.XiangMuMingCheng_ID != null) 
+            {
+                where += " and gz.XiangMuMingCheng_ID like '%" + s.XiangMuMingCheng_ID + "%'";
+            }
+            if (s.kaishi_time != null && s.kaishi_time != "")
+            {
+                where += " and gz.GaiZaoRiQi between '" + s.kaishi_time + "' and '" + s.jieshu_time + "'";
+            }
+            if (s.pageSize != null)
+            {
+                where += " order by gz.chuangjianshijian desc LIMIT " + s.pageSize * (s.pageIndex - 1) + "," + s.pageSize + "";
+            }
+
+            string sql = "select * from gaizao_dimian gz LEFT JOIN child_company_info fgs ON gz.FenGongSi = fgs.n_com_id  where 1=1 " + where + "";
+            Dictionary<string, object> res = new Dictionary<string, object>();
+            sql = string.Format(sql, "");
+            var dt1 = DbHelperMySQL.Query(sql).Tables[0];
+            res.Add("data", dt1);
+            return res;
+        }
+        /// <summary>
+        /// gaizao_dimian添加一条数据
+        /// </summary> 
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("AddInsert")]
+        public JsonMain AddInsert(GaiZao_DiMianModels model)
+        {
+            JsonMain jsonMain = new JsonMain();
+            jsonMain.Status = JsonStatus.error;
+            try
+            {
+                var gsid = "";
+                DataTable dt = DbHelperMySQL.Query("select n_com_id from project_info where n_proj_id='" + model.XiangMuMingCheng_ID + "'").Tables[0];
+                if (dt.Rows.Count > 0)
+                {
+                    gsid = dt.Rows[0][0].ToString();
+                }
+                else
+                {
+                    jsonMain.ErrorMsg = "项目信息不正确";
+                    return jsonMain;
+                }
+
+                string sql = @"INSERT INTO gaizao_dimian (
+                            fengongsi,
+                            luju,
+                            xiangmumingcheng_ID,
+                            xiangmumingcheng,
+                            zhandian,
+                            zhandian_ID,
+                            shebeixinghao,
+                            shifouyouchanggaizao,
+                            gaizaoneirong,
+                            chuangjianshijian,
+                            gaizaoriqi,
+                            zhixingren_id,
+                            zhixingren,
+                            shebeizhuangtai,
+                            LianXiRen_id,
+                            lianxiren,
+                            lianxidianhua,
+                            shebeiwendang,
+                            yiliuwenti,
+                            ZhuangTai
+                            )VALUES(
+                            '" + gsid + @"',
+                            '" + model.LuJu + @"',
+                            '" + model.XiangMuMingCheng_ID + @"',
+                            '" + model.XiangMuMingCheng + @"',
+                            '" + model.ZhanDian + @"',
+                            '" + model.ZhanDian_ID + @"',
+                            '" + model.SheBeiXingHao + @"',
+                            '" + model.ShiFouYouChangGaiZao + @"',
+                            '" + model.GaiZaoNeiRong + @"',
+                            '" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + @"',
+                            '" + model.GaiZaoRiQi + @"',
+                            '" + model.ZhiXingRen_ID + @"',
+                            '" + model.ZhiXingRen + @"',
+                            '" + model.SheBeiZhuangTai + @"',
+                            '" + model.LianXiRen_id + @"',
+                            '" + model.LianXiRen + @"',
+                            '" + model.LianXiDianHua + @"',
+                            '" + model.SheBeiWenDang + @"',
+                            '" + model.YiLiuWenTi + @"',
+                            '1') ";
+                int item = DbHelperMySQL.ExecuteSql(sql);
+                if (item > 0)
+                {
+                    XunJian_DuiWuModels models = new XunJian_DuiWuModels();
+                    models.gongsi = "鼎汉";
+                    models.ChengYuan_ID = model.ZhiXingRen_ID;
+                    models.ChengYuan = model.ZhiXingRen.ToString();
+                    models.DianHua = model.LianXiDianHua;
+                    models.ChuangJianShiJian = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    models.JiBie = "队长";
+                    models.LeiXing = "2";//巡检
+                    models.xunjian_dimian_id = DbHelperMySQL.Query("select max(id) id from gaizao_dimian").Tables[0].Rows[0]["id"].ToString();
+                    models.Xiangmu = model.XiangMuMingCheng;
+                    models.ZhanDian = model.ZhanDian;
+                    ChuanJianDuiWu(models);
+                    //   KaiShiShiJian(model);
+                    jsonMain.Status = JsonStatus.success;
+                    jsonMain.data = item;
+                }
+                else
+                {
+                    jsonMain.ErrorMsg = "创建改造事件失败";
+                }
+            }
+            catch (Exception ex)
+            {
+                jsonMain.ErrorMsg = ex.Message;
+            }
+            return jsonMain;
+        }
+        /// <summary>
+        /// 创建事件时增加一个任务树数据
+        /// </summary>
+        /// <param name="models"></param>
+        /// <returns></returns>
+        public int KaiShiShiJian([FromBody]GaiZao_DiMianModels models)
+        {
+            string sql = @"INSERT INTO gaizao_renwushu (
+                            ShiJian_ID,
+                            XiangMu_ID,
+                            RenYuan,
+                            RenYuan_ID,
+                            ShiJian,
+                            NeiRong,
+                            ZhuangTai,
+                            TuPian)VALUES(
+                            '" + DbHelperMySQL.Query("select max(id)id from gaizao_dimian").Tables[0].Rows[0]["id"].ToString() + @"',
+                            '" + models.XiangMuMingCheng_ID + @"',
+                            '" + models.LianXiRen + @"',
+                            '" + models.LianXiRen_id + @"',
+                            '" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + @"',
+                            '改造事件创建',
+                            '" + models.ZhuangTai + @"',
+                            '')";
+            int item = DbHelperMySQL.ExecuteSql(sql);
+            return item;
+        }
+
+        /// <summary>
+        /// 添加队长
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public int ChuanJianDuiWu([FromBody] XunJian_DuiWuModels model)
+        {
+
+            string sql = @"INSERT INTO XunJian_DuiWu (
+                            Xiangmu, 
+                            xunjian_dimian_id,
+                            gongsi,
+                            ZhanDian,
+                            JiBie,
+                            ChengYuan_id,
+                            ChengYuan,
+                            DianHua,
+                            LeiXing,
+                            ChuangJianShiJian) 
+                            VALUES (
+                            '" + model.Xiangmu + @"',
+                            '" + model.xunjian_dimian_id + @"',
+                            '鼎汉',
+                            '" + model.ZhanDian + @"',
+                            '队长',
+                            '" + model.ChengYuan_ID + @"',
+                            '" + model.ChengYuan + @"',
+                            '" + model.DianHua + @"',
+                            '2',
+                            '" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + @"')";
+            int item = DbHelperMySQL.ExecuteSql(sql);
+            return item;
+        }
+        /// <summary>
+        /// 更换队长
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("DuiZhangGengHuan")]
+        public string DuiZhangGengHuan([FromBody] XunJian_DuiWuModels model)
+        {
+            string sre;
+            try
+            {
+                string sql = @"Update into XunJian_DuiWu set JiBie = '队员' where xunjian_dimian_id = '" + model.xunjian_dimian_id + "'";
+                int item = DbHelperMySQL.ExecuteSql(sql);
+                string sql_s = @"Update into XunJian_DuiWu set JiBie = '队长' where xunjian_dimian_id = '" + model.xunjian_dimian_id + "' and id = '" + model.id + "'";
+                int item_2 = DbHelperMySQL.ExecuteSql(sql);
+                sre = "1";
+            }
+            catch (Exception ex)
+            {
+                sre = ex.ToString();
+            }
+            return sre;
+        }
+        /// <summary>
+        /// 查询队伍
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("AllXunJian_DuiWu")]
+        public Dictionary<string, object> selectXunJian_DuiWu([FromBody]XunJian_DuiWuModels model)
+        {
+            string where = " and xunjian_dimian_id = '" + model.xunjian_dimian_id + "' and LeiXing = '2'";
+            string sql = "select * from XunJian_DuiWu where 1=1" + where;
+            Dictionary<string, object> res = new Dictionary<string, object>();
+            var dt1 = DbHelperMySQL.Query(sql).Tables[0];
+            res.Add("data", dt1);
+            return res;
+        }
+
+        /// <summary>
+        /// 修改一条数据
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("Update")]
+        public string Update([FromBody] GaiZao_DiMianModels s)
+        {
+            string where = "";
+            if (s.FenGongSi != null && s.FenGongSi != "")
+            {
+                where += " fengongsi = '" + s.FenGongSi + "', ";
+            }
+            if (s.LuJu != null && s.LuJu != "")
+            {
+                where += " luju = '" + s.LuJu + "',";
+            }
+            if (s.XiangMuMingCheng_ID != null)
+            {
+                where += " XiangMuMingCheng_ID = '" + s.XiangMuMingCheng_ID + "',";
+            }
+            if (s.XiangMuMingCheng != null && s.XiangMuMingCheng != "")
+            {
+                where += " xiangmumingcheng = '" + s.XiangMuMingCheng + "',";
+            }
+            if (s.ZhanDian != null && s.ZhanDian != "")
+            {
+                where += " ZhanDian = '" + s.ZhanDian + "',";
+            }
+            if (s.SheBeiXingHao != null && s.SheBeiXingHao != "")
+            {
+                where += " SheBeiXingHao = '" + s.SheBeiXingHao + @"',";
+            }
+            if (s.ShiFouYouChangGaiZao != null && s.ShiFouYouChangGaiZao != "")
+            {
+                where += " ShiFouYouChangGaiZao = '" + s.ShiFouYouChangGaiZao + @"',";
+            }
+            if (s.GaiZaoNeiRong != null && s.GaiZaoNeiRong != "")
+            {
+                where += " GaiZaoNeiRong = '" + s.GaiZaoNeiRong + "',";
+            }
+            if (s.ChuangJianShiJian != null && s.ChuangJianShiJian != "")
+            {
+                where += " ChuangJianShiJian = '" + s.ChuangJianShiJian + "',";
+            }
+            if (s.GaiZaoRiQi != null && s.GaiZaoRiQi != "")
+            {
+                where += " GaiZaoRiQi = '" + s.GaiZaoRiQi + "',";
+            }
+            if (s.ZhiXingRen_ID != null)
+            {
+                where += " and ZhiXingRen_ID = '" + s.ZhiXingRen_ID + "'";
+            }
+            if (s.ZhiXingRen != null && s.ZhiXingRen != "")
+            {
+                where += " ZhiXingRen = '" + s.ZhiXingRen + "',";
+            }
+            if (s.SheBeiZhuangTai != null && s.SheBeiZhuangTai != "")
+            {
+                where += " SheBeiZhuangTai = '" + s.SheBeiZhuangTai + "',";
+            }
+            if (s.LianXiRen != null && s.LianXiRen != "")
+            {
+                where += " LianXiRen = '" + s.LianXiRen + "',";
+            }
+            if (s.LianXiDianHua != null && s.LianXiDianHua != "")
+            {
+                where += " LianXiDianHua = '" + s.LianXiDianHua + "',";
+            }
+            if (s.SheBeiWenDang != null && s.SheBeiWenDang != "")
+            {
+                where += " SheBeiWenDang = '" + s.SheBeiWenDang + "',";
+            }
+            if (s.YiLiuWenTi != null && s.YiLiuWenTi != "")
+            {
+                where += " YiLiuWenTi = '" + s.YiLiuWenTi + "',";
+            }
+            if (s.ZhuangTai != null && s.ZhuangTai != "")
+            {
+                where += " ZhuangTai = '" + s.ZhuangTai + "''";
+            }
+
+            where = where.Substring(0, where.Length - 1);
+            string sql = @"UPDATE gaizao_dimian SET 
+                            " + where + "  WHERE id = '" + s.id + "'";
+            int item = DbHelperMySQL.ExecuteSql(sql);
+            return item.ToString();
+        }
+        /// <summary>
+        /// 添加一条任务树记录
+        /// </summary>
+        /// <param name="models"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("Addgaizao_renwushu")]
+        public JsonMain Addgaizao_renwushu([FromBody]gaizao_renwushuModels models)
+        {
+            JsonMain jsonMain = new JsonMain();
+            try
+            {
+                string sql = @"INSERT INTO gaizao_renwushu (
+                            ShiJian_ID,
+                            XiangMu_ID,
+                            RenYuan,
+                            RenYuan_ID,
+                            ShiJian,
+                            NeiRong,
+                            ZhuangTai,
+                            TuPian)VALUES(
+                            '" + models.ShiJian_ID + @"',
+                            '" + models.XiangMu_ID + @"',
+                            '" + models.RenYuan + @"',
+                            '" + models.RenYuan_ID + @"',
+                            '" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + @"',
+                            '" + models.NeiRong + @"',
+                            '" + models.ZhuangTai + @"',
+                            '" + models.TuPian + @"')";
+                if (models.NeiRong.Contains("离开现场"))
+                {
+                    string sql_update = @"Update  gaizao_dimian set zhuangtai = '2' where id = '" + models.ShiJian_ID + "'";
+                    DbHelperMySQL.ExecuteSql(sql_update);
+                }
+                int item = DbHelperMySQL.ExecuteSql(sql);
+                jsonMain.Status = JsonStatus.success;
+                jsonMain.data = item;
+            }
+            catch (Exception ex)
+            {
+                jsonMain.ErrorMsg = ex.Message;
+                jsonMain.data = "";
+            }
+
+            return jsonMain;
+        }
+        /// <summary>
+        /// 查询任务树
+        /// </summary>
+        /// <param name="models"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("Allgaizao_renwushu")]
+        public JsonMain Allgaizao_renwushu([FromBody]gaizao_renwushuModels models)
+        {
+
+            JsonMain jsonMain = new JsonMain();
+            try
+            {
+                Dictionary<string, object> res = new Dictionary<string, object>();
+                string where = "";
+                if (models.ShiJian_ID != null && models.ShiJian_ID != "")
+                {
+                    where += " and ShiJian_ID = '" + models.ShiJian_ID + "'";
+                }
+                if (models.XiangMu_ID != null)
+                {
+                    where += " and XiangMu_ID = '" + models.XiangMu_ID + "'";
+                }
+                if (models.RenYuan_ID != null)
+                {
+                    where += " and RenYuan_ID = '" + models.RenYuan_ID + "'";
+                }
+                string sql = "select * from gaizao_renwushu  where 1=1 " + where + " order by shijian desc";
+
+                sql = string.Format(sql, "");
+                var dt1 = DbHelperMySQL.Query(sql).Tables[0];
+                var id = "";
+                try
+                {
+                    id = dt1.Rows[0]["id"].ToString();
+                }
+                catch
+                {
+
+                    id = "";
+                }
+
+                string sql_file = @"SELECT
+                                    * 
+                                    FROM
+                                    common_filelist 
+                                    WHERE
+                                    id IN (
+                                    SELECT
+                                    TRIM(SUBSTRING_INDEX( SUBSTRING_INDEX( a.tupian, ',', b.help_topic_id + 1 ), ',',- 1 ))  AS NAME 
+                                    FROM
+                                    gaizao_RenWuShu a
+                                    LEFT JOIN mysql.help_topic b ON b.help_topic_id < ( LENGTH( a.tupian ) - LENGTH( REPLACE ( a.tupian, ',', '' ) ) + 1 ) 
+                                    WHERE
+                                    ShiJian_ID = '" + models.ShiJian_ID + @"'
+                                    )";
+
+                var dt2 = DbHelperMySQL.Query(sql_file).Tables[0];
+
+                for (int i = 0; i < dt1.Rows.Count; i++)
+                {
+                    var str = "";
+                    for (int j = 0; j < dt2.Rows.Count; j++)
+                    {
+                        if (dt1.Rows[i]["TuPian"].ToString().Contains(dt2.Rows[j]["id"].ToString()))
+                        {
+                            str += dt2.Rows[j]["path"].ToString() + ",";
+                        }
+                    }
+                    dt1.Rows[i]["TuPian"] = str;
+                }
+                res.Add("data", dt1);
+                jsonMain.Status = JsonStatus.success;
+                jsonMain.data = res;
+            }
+            catch (Exception ex)
+            {
+                jsonMain.ErrorMsg = ex.Message;
+                jsonMain.data = "";
+            }
+
+            return jsonMain;
+        }
+        /// <summary>
+        /// 添加一条米票数据
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("AddMiPiao")]
+        public string AddMiPiao([FromBody]mipao_note_model model)
+        {
+            string sql1 = "select count(*)RN from XunJian_DuiWu where 1=1  and xunjian_dimian_id = '" + model.pro_id + "'";
+            var dt1 = DbHelperMySQL.Query(sql1).Tables[0];
+            var num = 3 / Convert.ToDouble(dt1.Rows[0]["RN"]);
+            string sql = @"insert into mipiao_note(
+                            num,
+                            pro_id,
+                            pro_type,
+                            user_id,
+                            createTime,
+                            eng_stage,
+                            month,
+                            xm_id,
+                            com_id,
+                            zd_id
+                            )VALUES
+                            ('" + num + @"',
+                            '" + model.pro_id + @"',
+                            '4',
+                            '" + model.user_id + @"',
+                            '" + model.createTime + @"',
+                            '" + model.eng_stage + @"',
+                            '" + model.month + @"',
+                            '" + model.xm_id + @"',
+                            '" + model.com_id + @"',
+                            '" + model.zd_id + @"')";
+            int item = DbHelperMySQL.ExecuteSql(sql);
+            return item.ToString();
+        }
+        /// <summary>
+        /// 邀请好友
+        /// </summary>
+        /// <param name="models"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("YaoQing")]
+        public JsonMain YaoQing([FromBody]InvitationModel models)
+        {
+            JsonMain jsonMain = new JsonMain();
+            try
+            {
+                models.type = 5;
+                models.company = "鼎汉";
+                models.state = 1;
+                models.company_2 = "鼎汉地面";
+                models.mipiao = 3;
+                var a = InvitationController.Add(models);
+                jsonMain.data = 1;
+            }
+            catch (Exception ex)
+            {
+                jsonMain.ErrorMsg = ex.ToString();
+                jsonMain.data = "";
+            }
+            return jsonMain;
+        }
+        /// <summary>
+        /// 统计状态条数
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("TongJi")]
+        public Dictionary<string, object> TongJi(GaiZao_DiMianModels models)
+        {
+            Dictionary<string, object> res = new Dictionary<string, object>();
+            string sql = @"select count(ZhuangTai)TiaoShu,'1'zhuangtai from gaizao_dimian where ZhuangTai = '1' and ZhiXingRen_ID = '" + models.ZhiXingRen_ID + @"'
+                            union ALL
+                            select count(ZhuangTai)TiaoShu,'2'zhuangtai from gaizao_dimian where ZhuangTai = '2' and ZhiXingRen_ID = '" + models.ZhiXingRen_ID + @"'
+                            union ALL
+                            select count(ZhuangTai)TiaoShu,'3'zhuangtai from gaizao_dimian where ZhuangTai = '3' and ZhiXingRen_ID = '" + models.ZhiXingRen_ID + @"'
+                            union ALL
+                            select count(ZhuangTai)TiaoShu,'4'zhuangtai from gaizao_dimian where ZhuangTai = '4' and ZhiXingRen_ID = '" + models.ZhiXingRen_ID + @"'
+                            union ALL
+                            select count(ZhuangTai)TiaoShu,'5'zhuangtai from gaizao_dimian where ZhuangTai = '5' and ZhiXingRen_ID = '" + models.ZhiXingRen_ID + @"'";
+            var dt1 = DbHelperMySQL.Query(sql).Tables[0];
+            res.Add("data", dt1);
+            return res;
+        }
+        /// <summary>
+        /// 页面下拉框
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("QuYuXiaLa")]
+        public Dictionary<string, object> QuYuXiaLa(string item = "")
+        {
+            string where = "";
+            if (item != "")
+            {
+                where = " and n_com_id = '" + item + "'";
+            }
+            Dictionary<string, object> res = new Dictionary<string, object>();
+
+            string sql = "select * from child_company_info where level_super_comid = 2 and n_com_id <>11" + where;
+            sql = string.Format(sql, "");
+            var ds = DbHelperMySQL.Query(sql).Tables[0];
+            res.Add("data", ds);
+            return res;
+        }
+    }
+}
